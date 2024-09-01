@@ -8,6 +8,11 @@ require (
 )
 
 require (
+	github.com/midtrans/midtrans-go v1.3.8
+	github.com/veritrans/go-midtrans v0.0.0-20210616100512-16326c5eeb00
+)
+
+require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

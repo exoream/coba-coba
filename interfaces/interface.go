@@ -18,8 +18,9 @@ type AdminService interface {
 }
 
 type TransactionService interface {
-	ProcessTransaction(userID int, adminID int) (model.Transaction, string, error)
-	GetTransaction(id int) (model.Transaction, error)
+	ProcessTransaction(userID int, adminID int, price float64) (model.Transaction, string, error)
+	HandleMidtransNotification(notificationPayload map[string]interface{}) error
+	GetTransaction(id int) (model.Transaction, string, error)
 }
 
 type WebSocketService interface {

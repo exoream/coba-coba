@@ -2,14 +2,18 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"socket/interfaces"
 	"socket/model"
+	"strconv"
 	"sync"
 	"time"
 
 	"socket/helper"
 
 	"github.com/gorilla/websocket"
+	"github.com/midtrans/midtrans-go"
+	"github.com/midtrans/midtrans-go/snap"
 )
 
 
@@ -98,9 +102,17 @@ func (s *service) GetAllAdmins() ([]model.Admin, error) {
 }
 
 // ProcessTransaction implements interfaces.TransactionService.
-func (s *service) ProcessTransaction(userID int, adminID int) (model.Transaction, string, error) {
+func (s *service) ProcessTransaction(userID int, adminID int, price float64) (model.Transaction, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	for _, transaction := range s.transactions {
+		if transaction.UserID == userID || transaction.AdminID == adminID {
+			if transaction.Status == "success" && time.Now().Before(transaction.ExpiresAt) {
+				return model.Transaction{}, "", errors.New("user or admin already has an active session")
+			}
+		}
+	}
 
 	// Verify user and admin
 	if _, exists := s.users[userID]; !exists {
@@ -120,29 +132,126 @@ func (s *service) ProcessTransaction(userID int, adminID int) (model.Transaction
 		ID:        transactionID,
 		UserID:    userID,
 		AdminID:   adminID,
+		Price:     price,
+		Status:    "pending",
 		ExpiresAt: expiration,
 	}
 	s.transactions[transactionID] = transaction
 
-	token, err := helper.CreateJWT(userID, adminID, transactionID)
-    if err != nil {
-        return model.Transaction{}, "", err
+	// token, err := helper.CreateJWT(userID, adminID, transactionID)
+    // if err != nil {
+    //     return model.Transaction{}, "", err
+    // }
+
+	// Setup Midtrans Snap Client
+	snapClient := snap.Client{}
+	snapClient.New("SB-Mid-server-YCb-jBlX8BE6NZWIsQvW7hTA", midtrans.Sandbox)
+
+	chargeReq := &snap.Request{
+		TransactionDetails: midtrans.TransactionDetails{
+			OrderID:  fmt.Sprintf("%d", transactionID),
+			GrossAmt: int64(price),
+		},
+		CustomerDetail: &midtrans.CustomerDetails{
+			Email: fmt.Sprintf("user%d@example.com", userID),
+		},
+		EnabledPayments: snap.AllSnapPaymentType,
+		CreditCard: &snap.CreditCardDetails{
+			Secure: true,
+		},
+	}
+
+	// Request to Midtrans Snap API
+	snapResponse, err := snapClient.CreateTransaction(chargeReq)
+	if err != nil {
+		return model.Transaction{}, "", err
+	}
+
+	if snapResponse.RedirectURL != "" {
+		transaction.Status = "pending_payment"
+		s.transactions[transactionID] = transaction
+		return transaction, snapResponse.RedirectURL, nil
+	} else {
+		return model.Transaction{}, "", errors.New("failed to create payment")
+	}
+}
+
+func (s *service) HandleMidtransNotification(notificationPayload map[string]interface{}) error {
+    orderID, ok := notificationPayload["order_id"].(string)
+    if !ok || orderID == "" {
+        return errors.New("missing or invalid order_id")
     }
 
+    // Extract transactionStatus safely
+    transactionStatus, ok := notificationPayload["transaction_status"].(string)
+    if !ok || transactionStatus == "" {
+        return errors.New("missing or invalid transaction_status")
+    }
 
-	return transaction, token, nil
+    // Extract fraudStatus safely
+    fraudStatus, ok := notificationPayload["fraud_status"].(string)
+    if !ok || fraudStatus == "" {
+        return errors.New("missing or invalid fraud_status")
+    }
+
+    // Parse orderID to get transaction ID
+    transactionID, err := strconv.Atoi(orderID)
+    if err != nil {
+        return err
+    }
+
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    // Get the transaction from the map
+    transaction, exists := s.transactions[transactionID]
+    if !exists {
+        return errors.New("transaction not found")
+    }
+
+    // Update transaction status based on Midtrans notification
+    switch transactionStatus {
+    case "capture":
+        if fraudStatus == "accept" {
+            transaction.Status = "success"
+        } else {
+            transaction.Status = "fraud"
+        }
+    case "settlement":
+        transaction.Status = "success" // Payment is complete
+    case "deny", "cancel", "expire":
+        transaction.Status = "failed"
+    case "pending":
+        transaction.Status = "pending_payment"
+    default:
+        return errors.New("unknown transaction status")
+    }
+
+    // Save the updated transaction
+    s.transactions[transactionID] = transaction
+    return nil
 }
 
 // GetTransaction implements interfaces.TransactionService.
-func (s *service) GetTransaction(id int) (model.Transaction, error) {
+func (s *service) GetTransaction(id int) (model.Transaction, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	transaction, exists := s.transactions[id]
 	if !exists {
-		return model.Transaction{}, errors.New("transaction not found")
+		return model.Transaction{}, "", errors.New("transaction not found")
 	}
-	return transaction, nil
+
+	var token string
+	if transaction.Status == "success" {
+		// Create JWT token only if transaction is successful
+		var err error
+		token, err = helper.CreateJWT(transaction.UserID, transaction.AdminID, id)
+		if err != nil {
+			return model.Transaction{}, "", err
+		}
+	}
+	return transaction, token, nil
 }
 
 // HandleConnection implements interfaces.WebSocketService.
@@ -160,6 +269,20 @@ func (s *service) HandleConnection(tokenStr string, role string, conn *websocket
     adminID := int((*claims)["admin_id"].(float64))
 	transactionID := int((*claims)["transaction_id"].(float64))
 
+	// Check if the user or admin is already in an active session
+	if role == "admin" {
+		if _, exists := s.adminSessions[adminID]; exists {
+			conn.Close()
+			return errors.New("admin already in an active session")
+		}
+	} else {
+		if _, exists := s.userSessions[userID]; exists {
+			conn.Close()
+			return errors.New("user already in an active session")
+		}
+	}
+
+	
     transaction, exists := s.transactions[transactionID]
     if !exists || time.Now().After(transaction.ExpiresAt) {
         conn.Close()

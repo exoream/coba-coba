@@ -98,7 +98,7 @@ func (c *Controller) ProcessTransaction(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	transaction, token, err := c.TransactionService.ProcessTransaction(transaction.UserID, transaction.AdminID)
+	transaction, token, err := c.TransactionService.ProcessTransaction(transaction.UserID, transaction.AdminID, transaction.Price)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -109,6 +109,22 @@ func (c *Controller) ProcessTransaction(ctx echo.Context) error {
 	})
 }
 
+func (c *Controller) MidtransNotification(ctx echo.Context) error {
+    var notificationPayload map[string]interface{}
+
+    if err := ctx.Bind(&notificationPayload); err != nil {
+        return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+    }
+
+    // Handle notification
+    err := c.TransactionService.HandleMidtransNotification(notificationPayload)
+    if err != nil {
+        return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+    }
+
+    return ctx.JSON(http.StatusOK, map[string]string{"status": "success"})
+}
+
 func (c *Controller) GetTransaction(ctx echo.Context) error {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -116,12 +132,20 @@ func (c *Controller) GetTransaction(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid ID format"})
 	}
 
-	transaction, err := c.TransactionService.GetTransaction(id)
+	transaction, token, err := c.TransactionService.GetTransaction(id)
 	if err != nil {
 		return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 	}
 
-	return ctx.JSON(http.StatusOK, transaction)
+	response := map[string]interface{}{
+		"transaction": transaction,
+	}
+
+	if token != "" {
+		response["token"] = token
+	}
+
+	return ctx.JSON(http.StatusOK, response)
 }
 
 func (c *Controller) HandleWebSocket(ctx echo.Context) error {

@@ -23,4 +23,8 @@ func RegisterRoutes(e *echo.Echo, ctrl *controller.Controller) {
 	// WebSocket route
 	e.GET("/chat", ctrl.HandleWebSocket)
 	e.GET("/tes", ctrl.SimpleWebSocketHandler)
+
+	// Midtrans notification route
+	e.POST("/midtrans/notification", ctrl.MidtransNotification)
+	
 }
