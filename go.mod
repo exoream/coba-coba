@@ -12,6 +12,8 @@ require (
 	github.com/veritrans/go-midtrans v0.0.0-20210616100512-16326c5eeb00
 )
 
+require github.com/joho/godotenv v1.5.1 // indirect
+
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/labstack/gommon v0.4.2 // indirect

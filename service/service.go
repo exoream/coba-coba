@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"os"
 	"socket/interfaces"
 	"socket/model"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"socket/helper"
 
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 	"github.com/midtrans/midtrans-go"
 	"github.com/midtrans/midtrans-go/snap"
 )
@@ -142,10 +144,10 @@ func (s *service) ProcessTransaction(userID int, adminID int, price float64) (mo
     // if err != nil {
     //     return model.Transaction{}, "", err
     // }
-
+	godotenv.Load()
 	// Setup Midtrans Snap Client
 	snapClient := snap.Client{}
-	snapClient.New("SB-Mid-server-YCb-jBlX8BE6NZWIsQvW7hTA", midtrans.Sandbox)
+	snapClient.New(os.Getenv("MIDTRANS_CLIENT"), midtrans.Sandbox)
 
 	chargeReq := &snap.Request{
 		TransactionDetails: midtrans.TransactionDetails{
