@@ -1,12 +1,18 @@
 package routes
 
 import (
+	"net/http"
 	"socket/controller"
 
 	"github.com/labstack/echo/v4"
 )
 
 func RegisterRoutes(e *echo.Echo, ctrl *controller.Controller) {
+
+	e.GET("/", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Selamat Datang di Aplikasi Kami!")
+	})
+	
 	// Routes for User
 	e.POST("/users", ctrl.CreateUser)
     e.GET("/users/:id", ctrl.GetUser)
