@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"socket/model"
+	"socket/api/model"
 
 	"github.com/gorilla/websocket"
 )

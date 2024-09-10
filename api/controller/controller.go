@@ -2,8 +2,8 @@ package controller
 
 import (
 	"net/http"
-	"socket/interfaces"
-	"socket/model"
+	"socket/api/interfaces"
+	"socket/api/model"
 	"strconv"
 
 	"github.com/gorilla/websocket"

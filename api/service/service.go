@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"socket/interfaces"
-	"socket/model"
+	"socket/api/interfaces"
+	"socket/api/model"
 	"strconv"
 	"sync"
 	"time"
 
-	"socket/helper"
+	"socket/api/helper"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"

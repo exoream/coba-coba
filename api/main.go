@@ -1,9 +1,9 @@
 package main
 
 import (
-	"socket/controller"
-	"socket/routes"
-	"socket/service"
+	"socket/api/controller"
+	"socket/api/routes"
+	"socket/api/service"
 
 	"github.com/labstack/echo/v4"
 )
