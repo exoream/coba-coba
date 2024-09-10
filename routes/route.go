@@ -2,7 +2,7 @@ package routes
 
 import (
 	"net/http"
-	"socket/api/controller"
+	"socket/controller"
 
 	"github.com/labstack/echo/v4"
 )
