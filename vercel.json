@@ -1,4 +1,10 @@
 {
+  "builds": [
+    {
+      "src": "api/main.go",
+      "use": "@vercel/go"
+    }
+  ],
   "build": {
     "env": {
       "GO_BUILD_FLAGS": "-ldflags '-s -w'"
